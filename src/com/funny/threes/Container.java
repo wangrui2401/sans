@@ -2,13 +2,12 @@ package com.funny.threes;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 
+//public class Container extends ViewGroup {
 public class Container extends View {
 	
 	private static final int ROW_COUNT = 4;
@@ -28,24 +27,27 @@ public class Container extends View {
 	
 //	int[][] numbers = new int[ROW_COUNT][COLUMN_COUNT];
 	Number[][] numbers = new Number[ROW_COUNT][COLUMN_COUNT];
+	
+	Context context;
 
 	public Container(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		this.context = context;
+		testInit();
 	}
 	
 	private void testInit() {
-		int cw = getWidth();
-		int ch = getHeight();
-		int nw = (cw - GAP *(COLUMN_COUNT + 1))/COLUMN_COUNT;
-		int nh = (ch - GAP *(ROW_COUNT + 1))/ROW_COUNT;
-		for(int i=0; i<ROW_COUNT; i++) {
-			for(int j=0; j<COLUMN_COUNT; j++) {
-				int x = (nw + GAP)*j;
-				int y = (nh + GAP)*i;
-				numbers[i][j] = new Number(x, y, nw, nh);
-				numbers[i][j].setNumber(i*j%3);
-			}
-		}
+		numbers[2][2] = new Number(context);
+		numbers[2][2].setNumber(5);
+//		for(int i=0; i<ROW_COUNT; i++) {
+//			for(int j=0; j<COLUMN_COUNT; j++) {
+//				
+//				numbers[i][j] = new Number(context);
+//				
+//				numbers[i][j].setNumber(i*j%3);
+////				addView(numbers[i][j]);
+//			}
+//		}
 	}
 	
 	@Override
@@ -59,19 +61,20 @@ public class Container extends View {
 			moveLastX = ex;
 			moveLastY = ey;
 			moveDirection = MOVE_OVER;
+			invalidate();
 			break;
 		case MotionEvent.ACTION_MOVE:
 			if(moveDirection == MOVE_OVER) {
 				if(Math.abs((ex - moveStartX)) > Math.abs((ey - moveStartY))){
 					if(ex > moveStartX) {
 						moveDirection = MOVE_RIGHT;
-					} else {
+					} else if(ex < moveStartX) {
 						moveDirection = MOVE_LEFT;
 					}
-				} else {
+				} else if(Math.abs((ex - moveStartX)) < Math.abs((ey - moveStartY))) {
 					if(ey > moveStartY) {
 						moveDirection = MOVE_DOWN;
-					} else {
+					} else if(ey < moveStartY)  {
 						moveDirection = MOVE_UP;
 					}
 				}
@@ -81,13 +84,14 @@ public class Container extends View {
 			move(moveDirection, deltaX, deltaY);
 			moveLastX = ex;
 			moveLastY = ey;
+			invalidate();
 			break;
 		case MotionEvent.ACTION_UP:
 			stepOperation(moveDirection);
 			moveOver();
 			break;
 		}
-		invalidate();
+		
 		return true;
 	}
 
@@ -117,11 +121,14 @@ public class Container extends View {
 			for(int i = 1; i < ROW_COUNT; i++) {
 				for(int j = 0; j < COLUMN_COUNT; j++) {
 					if(numbers[i][j] != null && canMove(direction, i, j)) {
-						if(numbers[i - 1][j] != null) {
-							numbers[i][j].eatNumber(numbers[i - 1][j]);
+						numbers[i][j].stepOperation(direction, numbers[i][j].validMove());
+						if(numbers[i][j].validMove()) {
+							if(numbers[i - 1][j] != null) {
+								numbers[i][j].eatNumber(numbers[i - 1][j]);
+							}
+							numbers[i - 1][j] = numbers[i][j];
+							numbers[i][j] = null;
 						}
-						numbers[i - 1][j] = numbers[i][j];
-						numbers[i][j] = null;
 					}
 				}
 			}
@@ -130,11 +137,14 @@ public class Container extends View {
 			for(int j = COLUMN_COUNT - 2; j >= 0; j--) {
 				for(int i = 0; i < ROW_COUNT; i++) {
 					if(numbers[i][j] != null && canMove(direction, i, j)) {
-						if(numbers[i][j + 1] != null) {
-							numbers[i][j].eatNumber(numbers[i][j + 1]);
+						numbers[i][j].stepOperation(direction, numbers[i][j].validMove());
+						if(numbers[i][j].validMove()) {
+							if(numbers[i][j + 1] != null) {
+								numbers[i][j].eatNumber(numbers[i][j + 1]);
+							}
+							numbers[i][j + 1] = numbers[i][j];
+							numbers[i][j] = null;
 						}
-						numbers[i][j + 1] = numbers[i][j];
-						numbers[i][j] = null;
 					}
 				}
 			}
@@ -143,11 +153,14 @@ public class Container extends View {
 			for(int i = ROW_COUNT - 2; i >= 0; i--) {
 				for(int j = 0; j < COLUMN_COUNT; j++) {
 					if(numbers[i][j] != null && canMove(direction, i, j)) {
-						if(numbers[i + 1][j] != null) {
-							numbers[i][j].eatNumber(numbers[i + 1][j]);
+						numbers[i][j].stepOperation(direction, numbers[i][j].validMove());
+						if(numbers[i][j].validMove()) {
+							if(numbers[i + 1][j] != null) {
+								numbers[i][j].eatNumber(numbers[i + 1][j]);
+							}
+							numbers[i + 1][j] = numbers[i][j];
+							numbers[i][j] = null;
 						}
-						numbers[i + 1][j] = numbers[i][j];
-						numbers[i][j] = null;
 					}
 				}
 			}
@@ -156,11 +169,14 @@ public class Container extends View {
 			for(int j = 1; j < COLUMN_COUNT; j++) {
 				for(int i = 0; i < ROW_COUNT; i++) {
 					if(numbers[i][j] != null && canMove(direction, i, j)) {
-						if(numbers[i][j - 1] != null) {
-							numbers[i][j].eatNumber(numbers[i][j - 1]);
+						numbers[i][j].stepOperation(direction, numbers[i][j].validMove());
+						if(numbers[i][j].validMove()) {
+							if(numbers[i][j - 1] != null) {
+								numbers[i][j].eatNumber(numbers[i][j - 1]);
+							}
+							numbers[i][j - 1] = numbers[i][j];
+							numbers[i][j] = null;	
 						}
-						numbers[i][j - 1] = numbers[i][j];
-						numbers[i][j] = null;
 					}
 				}
 			}
@@ -249,7 +265,21 @@ public class Container extends View {
 	protected void onLayout(boolean changed, int left, int top, int right,
 			int bottom) {
 		super.onLayout(changed, left, top, right, bottom);
-		testInit();
+		int cw = right - left;
+		int ch = bottom - top;
+		int nw = (cw - GAP *(COLUMN_COUNT + 1))/COLUMN_COUNT;
+		int nh = (ch - GAP *(ROW_COUNT + 1))/ROW_COUNT;
+		
+		for(int i=0; i<ROW_COUNT; i++) {
+			for(int j=0; j<COLUMN_COUNT; j++) {
+				int x = (nw + GAP)*j;
+				int y = (nh + GAP)*i;
+				if(numbers[i][j] != null) {
+					numbers[i][j].initNumber(x, y, nw, nh);
+//					numbers[i][j].layout(x, y, x + nw, y + nh);
+				}
+			}
+		}
 	}
 	
 	@Override
@@ -259,68 +289,9 @@ public class Container extends View {
 			for(int j=0; j<COLUMN_COUNT; j++) {
 //				drawNumber(canvas, i, j);
 				if(numbers[i][j] != null) {
-					numbers[i][j].draw(canvas);	
+					numbers[i][j].draw(canvas);
 				}
 			}
-		}
-	}
-	
-	class Number {
-		int x, y, width, height;
-		int totalMoveX, totalMoveY;
-		int number;
-		int color;
-		int bgId;
-		
-		public Number(int x, int y, int width, int height) {
-			this.x = x;
-			this.y = y;
-			this.width = width;
-			this.height = height;
-			this.color = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
-		}
-		
-		public void setNumber(int number) {
-			this.number = number;
-		}
-		
-		public void eatNumber(Number number) {
-			
-		}
-		
-		public void move(int direction, int deltaX, int deltaY) {
-			switch(direction) {
-			case MOVE_LEFT:
-			case MOVE_RIGHT:
-				totalMoveX += deltaX;
-				if(Math.abs(totalMoveX) < width) {
-					x = x + deltaX;	
-				}
-				break;
-			case MOVE_UP:
-			case MOVE_DOWN:
-				totalMoveY += deltaY;
-				if(Math.abs(totalMoveY) < height) {
-					y = y + deltaY;	
-				}
-				break;
-			}
-		}
-		
-		public void moveOver() {
-			
-			totalMoveX = 0;
-			totalMoveY = 0;
-		}
-		
-		public void draw(Canvas canvas){
-			Paint p = new Paint();
-			p.setColor(color);
-			Rect rect = new Rect(x, y, x+width, y+height);
-			canvas.drawRect(rect, p);
-			p.setColor(Color.WHITE);
-			p.setTextSize(20);
-			canvas.drawText("" + number, x + width/2, y + height/2, p);
 		}
 	}
 	
