@@ -1,5 +1,8 @@
 package com.funny.threes;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Camera;
 import android.graphics.Canvas;
@@ -11,6 +14,9 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
 
 public class ContainerAd extends View {
 	
@@ -23,8 +29,8 @@ public class ContainerAd extends View {
 	
 	private static final int TRANSLATE_ANIMATION_DURATION = 250;
 	private static final int TRANSLATE_ANIMATION_INTERVAL = 25;
-	private static final int ROTATE_ANIMATION_DURATION = 10000;
-	private static final int ROTATE_ANIMATION_INTERVAL = 50;
+	private static final int ROTATE_ANIMATION_DURATION = 300;
+	private static final int ROTATE_ANIMATION_INTERVAL = 25;
 	
 	private static final int COLOR_BLUE_TOP = 0xff6bceff;
 	private static final int COLOR_BLUE_BOTTOM = 0xff63aaf7;
@@ -191,7 +197,6 @@ public class ContainerAd extends View {
 			showAnimation(mBgCell[0][0].left - mBgCell[0][0].right - mColumnGap, 0);
 			break;
 		}
-		
 	}
 	
 	private void showAnimation(float deltaTotalX, float deltaTotalY) {
@@ -211,12 +216,6 @@ public class ContainerAd extends View {
 								mNumbers[i][j].rectF.top += deltaY;
 								mNumbers[i][j].rectF.bottom += deltaY;
 							}
-//							if(mNumberCell[i][j] != null && canMove(i, j)) {
-//								mNumberCell[i][j].left += deltaX;
-//								mNumberCell[i][j].right += deltaX;
-//								mNumberCell[i][j].top += deltaY;
-//								mNumberCell[i][j].bottom += deltaY;
-//							}
 						}
 					}
 					postInvalidate();
@@ -228,47 +227,28 @@ public class ContainerAd extends View {
 					}
 				}
 				
-				//rotate
-				float deltaDegree = 10f;
-				float degree = 270f;
-				int rotateCount = (int)(90f/deltaDegree);
-				long sleepInterval = ROTATE_ANIMATION_DURATION/rotateCount;
-				float totalDegree = 0f;
-				//first 90 degree
-				while(rotateCount > 0) {
-//					totalDegree += deltaDegree;
-//					if(totalDegree < 90f) {
-//						degree += deltaDegree;	
-//					} else {
-//						degree = totalDegree + 180 + deltaDegree;
-//					}
-					degree += deltaDegree;
-					Log.i("Threes", "degree " + degree);
+				//rotate, Note: rotateCount must be even number
+				int rotateCount = ROTATE_ANIMATION_DURATION/ROTATE_ANIMATION_INTERVAL;
+				int rotateTime = 0;
+				float deltaRotateX = (mBgCell[0][0].right - mBgCell[0][0].left + mColumnGap/4)/rotateCount*2;
+				while(rotateTime < rotateCount) {
 					for(int i=0; i<ROW_COUNT; i++) {
 						for(int j=0; j<COLUMN_COUNT; j++) {
 							if(mNumbers[i][j] != null && canMove(i, j)) {
-								Camera camera = new Camera();
-								camera.save(); 
-								camera.rotateY(degree); 
-								Log.i("Threes", "rotateY, degree " + degree);
-								float centerX = mNumbers[i][j].rectF.left + 
-										(mNumbers[i][j].rectF.right - mNumbers[i][j].rectF.left)/2;
-								float centerY = mNumbers[i][j].rectF.top + 
-										(mNumbers[i][j].rectF.bottom - mNumbers[i][j].rectF.top)/2;
-								Matrix matrix = new Matrix();
-								camera.getMatrix(matrix);
-								camera.restore();
-								matrix.preTranslate(-centerX, -centerY);  
-						        matrix.postTranslate(centerX, centerY);  
-								matrix.mapRect(mNumbers[i][j].rectF);
+								if(rotateTime < rotateCount/2) {
+									mNumbers[i][j].rectF.left += deltaRotateX/2;
+									mNumbers[i][j].rectF.right -= deltaRotateX/2;	
+								} else {
+									mNumbers[i][j].rectF.left -= deltaRotateX/2;
+									mNumbers[i][j].rectF.right += deltaRotateX/2;
+								}
 							}
 						}
 					}
 					postInvalidate();
-					
-					rotateCount--;
+					rotateTime++;
 					try {
-						Thread.sleep(sleepInterval);
+						Thread.sleep(TRANSLATE_ANIMATION_INTERVAL);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
