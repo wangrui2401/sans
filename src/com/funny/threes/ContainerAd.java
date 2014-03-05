@@ -1,25 +1,48 @@
 package com.funny.threes;
 
 import android.content.Context;
+import android.graphics.Camera;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 
 public class ContainerAd extends View {
 	
 	private static final int ROW_COUNT = 4;
 	private static final int COLUMN_COUNT = 4;
-	Number[][] mNumbers = new Number[ROW_COUNT][COLUMN_COUNT];
+	private static final int MOVE_DIRECTION_UP = 0;
+	private static final int MOVE_DIRECTION_RIGHT = 1;
+	private static final int MOVE_DIRECTION_DOWN = 2;
+	private static final int MOVE_DIRECTION_LEFT = 3;
+	
+	private static final int TRANSLATE_ANIMATION_DURATION = 250;
+	private static final int TRANSLATE_ANIMATION_INTERVAL = 25;
+	private static final int ROTATE_ANIMATION_DURATION = 10000;
+	private static final int ROTATE_ANIMATION_INTERVAL = 50;
+	
+	private static final int COLOR_BLUE_TOP = 0xff6bceff;
+	private static final int COLOR_BLUE_BOTTOM = 0xff63aaf7;
+	private static final int COLOR_RED_TOP = 0xffff6583;
+	private static final int COLOR_RED_BOTTOM = 0xffce557b;
+	private static final int COLOR_WHITE = 0xffffffff;
+	private static final int COLOR_YELLOW = 0xffffce6b;
+	
+	Number[][] mNumbers;
 	Context mContext;
 	Paint mPaint;
 	RectF mBgRect1, mBgRect2;
 	RectF[][] mBgCell;
 	RectF[][] mNumberCell;
 	float mRowGap, mColumnGap;
-
+	float mMoveStartX, mMoveStartY;
+	int mMoveDirection;
+	  
 	public ContainerAd(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		this.mContext = context; 
@@ -29,6 +52,8 @@ public class ContainerAd extends View {
 	private void init() {
 		mPaint = new Paint();
 		mPaint.setAntiAlias(true);
+		
+		mNumbers = new Number[ROW_COUNT][COLUMN_COUNT];
 	}
 	
 	@Override
@@ -74,17 +99,189 @@ public class ContainerAd extends View {
 	 * For test only
 	 */
 	private void testGenerateNumbers(float bgCellWidth, float bgCellHeight) {
-		mNumberCell[0][0] = generateNumberCellRect(0, 0, bgCellWidth, bgCellHeight);
-		mNumberCell[0][1] = generateNumberCellRect(0, 1, bgCellWidth, bgCellHeight);
-		mNumberCell[1][1] = generateNumberCellRect(1, 1, bgCellWidth, bgCellHeight);
-		mNumberCell[2][1] = generateNumberCellRect(2, 1, bgCellWidth, bgCellHeight);
+		mNumbers[0][0] = generateNumber(0, 0, 1);
+		mNumbers[0][1] = generateNumber(0, 1, 2);
+		mNumbers[1][1] = generateNumber(1, 1, 3);
+		mNumbers[2][1] = generateNumber(2, 1, 12);
+//		mNumberCell[0][0] = generateNumberCellRect(0, 0, bgCellWidth, bgCellHeight);
+//		mNumberCell[0][1] = generateNumberCellRect(0, 1, bgCellWidth, bgCellHeight);
+//		mNumberCell[1][1] = generateNumberCellRect(1, 1, bgCellWidth, bgCellHeight);
+//		mNumberCell[2][1] = generateNumberCellRect(2, 1, bgCellWidth, bgCellHeight);
+	}
+	
+	private Number generateNumber(int row, int column, int value) {
+		Number number = new Number();
+		number.number = value;
+		number.rectF = generateNumberCellRect(row, column, 
+				mBgCell[row][column].right - mBgCell[row][column].left, 
+				mBgCell[row][column].bottom - mBgCell[row][column].top);
+		if(value == 1) {
+			number.colorBottom = COLOR_BLUE_BOTTOM;
+			number.colorTop = COLOR_BLUE_TOP;
+		} else if(value == 2) {
+			number.colorBottom = COLOR_RED_BOTTOM;
+			number.colorTop = COLOR_RED_TOP;
+		} else {
+			number.colorBottom = COLOR_YELLOW;
+			number.colorTop = COLOR_WHITE;
+		}
+		number.row = row;
+		number.column = column;
+		return number;
 	}
 	
 	private RectF generateNumberCellRect(int row, int column, float bgCellWidth, float bgCellHeight) {
 		float x = mBgCell[row][column].left - mColumnGap/4;
-		float y = mBgCell[row][column].top - mRowGap/2;
+		float y = mBgCell[row][column].top;
 		RectF numberCell = new RectF(x, y, mBgCell[row][column].right, y + bgCellHeight);
 		return numberCell;
+	}
+	
+	@Override
+	public boolean onTouchEvent(MotionEvent event) {
+		float ex = event.getX();
+		float ey = event.getY();
+		switch(event.getAction()) {
+		case MotionEvent.ACTION_DOWN:
+			mMoveStartX = ex;
+			mMoveStartY = ey;
+			break;
+		case MotionEvent.ACTION_MOVE:
+			mMoveDirection = getMoveDirection(ex, ey, mMoveStartX, mMoveStartY);
+			break;
+		case MotionEvent.ACTION_UP:
+			testAnimation();
+			break;
+		}
+		return true;
+	}
+	
+	private int getMoveDirection(float ex, float ey, float sx, float sy) {
+		int direction = -1;
+		float dx = ex - sx;
+		float dy = ey - sy;
+		if(Math.abs(dx) > Math.abs(dy*1.5f)) {
+			if(dx > 0) {
+				direction = MOVE_DIRECTION_RIGHT;
+			} else {
+				direction = MOVE_DIRECTION_LEFT;
+			}
+		} else if(Math.abs(dy) > Math.abs(dx*1.5f)) {
+			if(dy > 0) {
+				direction = MOVE_DIRECTION_DOWN;
+			} else {
+				direction = MOVE_DIRECTION_UP;
+			}
+		}
+		return direction;
+	}
+	
+	private void testAnimation() {
+		switch(mMoveDirection) {
+		case MOVE_DIRECTION_UP:
+			showAnimation(0, mBgCell[0][0].top - mBgCell[0][0].bottom - mRowGap);
+			break;
+		case MOVE_DIRECTION_RIGHT:
+			showAnimation(mBgCell[0][0].right - mBgCell[0][0].left + mColumnGap, 0);
+			break;
+		case MOVE_DIRECTION_DOWN:
+			showAnimation(0, mBgCell[0][0].bottom - mBgCell[0][0].top + mRowGap);
+			break;
+		case MOVE_DIRECTION_LEFT:
+			showAnimation(mBgCell[0][0].left - mBgCell[0][0].right - mColumnGap, 0);
+			break;
+		}
+		
+	}
+	
+	private void showAnimation(float deltaTotalX, float deltaTotalY) {
+		final float deltaX = deltaTotalX/(TRANSLATE_ANIMATION_DURATION/TRANSLATE_ANIMATION_INTERVAL);
+		final float deltaY = deltaTotalY/(TRANSLATE_ANIMATION_DURATION/TRANSLATE_ANIMATION_INTERVAL);
+		Thread translateThread = new Thread() {
+			int translateCount = TRANSLATE_ANIMATION_DURATION/TRANSLATE_ANIMATION_INTERVAL;
+			@Override
+			public void run() {
+				//translate animation
+				while(translateCount > 0) {
+					for(int i=0; i<ROW_COUNT; i++) {
+						for(int j=0; j<COLUMN_COUNT; j++) {
+							if(mNumbers[i][j] != null && canMove(i, j)) {
+								mNumbers[i][j].rectF.left += deltaX;
+								mNumbers[i][j].rectF.right += deltaX;
+								mNumbers[i][j].rectF.top += deltaY;
+								mNumbers[i][j].rectF.bottom += deltaY;
+							}
+//							if(mNumberCell[i][j] != null && canMove(i, j)) {
+//								mNumberCell[i][j].left += deltaX;
+//								mNumberCell[i][j].right += deltaX;
+//								mNumberCell[i][j].top += deltaY;
+//								mNumberCell[i][j].bottom += deltaY;
+//							}
+						}
+					}
+					postInvalidate();
+					translateCount--;
+					try {
+						Thread.sleep(TRANSLATE_ANIMATION_INTERVAL);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				
+				//rotate
+				float deltaDegree = 10f;
+				float degree = 270f;
+				int rotateCount = (int)(90f/deltaDegree);
+				long sleepInterval = ROTATE_ANIMATION_DURATION/rotateCount;
+				float totalDegree = 0f;
+				//first 90 degree
+				while(rotateCount > 0) {
+//					totalDegree += deltaDegree;
+//					if(totalDegree < 90f) {
+//						degree += deltaDegree;	
+//					} else {
+//						degree = totalDegree + 180 + deltaDegree;
+//					}
+					degree += deltaDegree;
+					Log.i("Threes", "degree " + degree);
+					for(int i=0; i<ROW_COUNT; i++) {
+						for(int j=0; j<COLUMN_COUNT; j++) {
+							if(mNumbers[i][j] != null && canMove(i, j)) {
+								Camera camera = new Camera();
+								camera.save(); 
+								camera.rotateY(degree); 
+								Log.i("Threes", "rotateY, degree " + degree);
+								float centerX = mNumbers[i][j].rectF.left + 
+										(mNumbers[i][j].rectF.right - mNumbers[i][j].rectF.left)/2;
+								float centerY = mNumbers[i][j].rectF.top + 
+										(mNumbers[i][j].rectF.bottom - mNumbers[i][j].rectF.top)/2;
+								Matrix matrix = new Matrix();
+								camera.getMatrix(matrix);
+								camera.restore();
+								matrix.preTranslate(-centerX, -centerY);  
+						        matrix.postTranslate(centerX, centerY);  
+								matrix.mapRect(mNumbers[i][j].rectF);
+							}
+						}
+					}
+					postInvalidate();
+					
+					rotateCount--;
+					try {
+						Thread.sleep(sleepInterval);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				super.run();
+			}
+		};
+		translateThread.start();
+	}
+	
+	private boolean canMove(int row, int column) {
+		boolean canMove = true;
+		return canMove;
 	}
 	
 	@Override
@@ -108,7 +305,7 @@ public class ContainerAd extends View {
 		canvas.drawRoundRect(mBgRect1, 20, 20, mPaint);
 		
 		canvas.restore();
-		mPaint.setColor(0xffe5e5e5);
+		mPaint.setColor(0xffe6e6e6);
 		canvas.drawRoundRect(mBgRect2, 20, 20, mPaint);
 		
 		//draw background cell
@@ -124,25 +321,37 @@ public class ContainerAd extends View {
 		//draw numbers
 		for(int i=0; i<ROW_COUNT; i++) {
 			for(int j=0; j<COLUMN_COUNT; j++) {
-				if(mNumberCell[i][j] != null) {
-					int color = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
-					mPaint.setColor(color);
-					canvas.drawRoundRect(mNumberCell[i][j], 10, 10, mPaint);
+				if(mNumbers[i][j] != null) {
+					int colorBottom = mNumbers[i][j].colorBottom;
+					mPaint.setColor(colorBottom);
+					canvas.drawRoundRect(mNumbers[i][j].rectF, 10, 10, mPaint);
 					canvas.save();
-					int color2 = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
-					mPaint.setColor(color2);
-					canvas.translate(0, mRowGap/2);
-					canvas.drawRoundRect(mNumberCell[i][j], 10, 10, mPaint);
+					int colorTop = mNumbers[i][j].colorTop;
+					mPaint.setColor(colorTop);
+					canvas.translate(0, -mRowGap/2);
+					canvas.drawRoundRect(mNumbers[i][j].rectF, 10, 10, mPaint);
 					canvas.restore();
 				}
+//				if(mNumberCell[i][j] != null) {
+//					int color = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
+//					mPaint.setColor(color);
+//					canvas.drawRoundRect(mNumberCell[i][j], 10, 10, mPaint);
+//					canvas.save();
+//					int color2 = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
+//					mPaint.setColor(color2);
+//					canvas.translate(0, mRowGap/2);
+//					canvas.drawRoundRect(mNumberCell[i][j], 10, 10, mPaint);
+//					canvas.restore();
+//				}
 			}
 		}
 	}
 	
 	class Number {
-		
+		RectF rectF;
 		int row, column;
 		int number;
+		int colorTop, colorBottom;
 	}
 
 }
