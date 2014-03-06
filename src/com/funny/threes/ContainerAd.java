@@ -1,22 +1,15 @@
 package com.funny.threes;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.ObjectAnimator;
 import android.content.Context;
-import android.graphics.Camera;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.Handler;
+import android.os.Message;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.animation.AccelerateInterpolator;
-import android.view.animation.DecelerateInterpolator;
-import android.view.animation.Interpolator;
 
 public class ContainerAd extends View {
 	
@@ -39,6 +32,8 @@ public class ContainerAd extends View {
 	private static final int COLOR_WHITE = 0xffffffff;
 	private static final int COLOR_YELLOW = 0xffffce6b;
 	
+	private static final int MSG_STEP_OVER = 101;
+	
 	Number[][] mNumbers;
 	Context mContext;
 	Paint mPaint;
@@ -47,6 +42,8 @@ public class ContainerAd extends View {
 	RectF[][] mNumberCell;
 	float mRowGap, mColumnGap;
 	float mMoveStartX, mMoveStartY;
+	float mMoveLastX, mMoveLastY;
+	float mMoveDeltaX, mMoveDeltaY;
 	int mMoveDirection;
 	  
 	public ContainerAd(Context context, AttributeSet attrs) {
@@ -55,6 +52,9 @@ public class ContainerAd extends View {
 		init();
 	}
 	
+	/**
+	 * Initiate the paint and number array
+	 */
 	private void init() {
 		mPaint = new Paint();
 		mPaint.setAntiAlias(true);
@@ -62,6 +62,10 @@ public class ContainerAd extends View {
 		mNumbers = new Number[ROW_COUNT][COLUMN_COUNT];
 	}
 	
+	/**
+	 * After gotten the width and height of Container, 
+	 * setup the views in Container.
+	 */
 	@Override
 	protected void onLayout(boolean changed, int left, int top, int right,
 			int bottom) {
@@ -109,12 +113,15 @@ public class ContainerAd extends View {
 		mNumbers[0][1] = generateNumber(0, 1, 2);
 		mNumbers[1][1] = generateNumber(1, 1, 3);
 		mNumbers[2][1] = generateNumber(2, 1, 12);
-//		mNumberCell[0][0] = generateNumberCellRect(0, 0, bgCellWidth, bgCellHeight);
-//		mNumberCell[0][1] = generateNumberCellRect(0, 1, bgCellWidth, bgCellHeight);
-//		mNumberCell[1][1] = generateNumberCellRect(1, 1, bgCellWidth, bgCellHeight);
-//		mNumberCell[2][1] = generateNumberCellRect(2, 1, bgCellWidth, bgCellHeight);
 	}
 	
+	/**
+	 * Generate a number in (row, column) with value.
+	 * @param row
+	 * @param column
+	 * @param value
+	 * @return
+	 */
 	private Number generateNumber(int row, int column, int value) {
 		Number number = new Number();
 		number.number = value;
@@ -136,6 +143,14 @@ public class ContainerAd extends View {
 		return number;
 	}
 	
+	/**
+	 * Generate the Number's RectF.
+	 * @param row
+	 * @param column
+	 * @param bgCellWidth
+	 * @param bgCellHeight
+	 * @return
+	 */
 	private RectF generateNumberCellRect(int row, int column, float bgCellWidth, float bgCellHeight) {
 		float x = mBgCell[row][column].left - mColumnGap/4;
 		float y = mBgCell[row][column].top;
@@ -151,15 +166,171 @@ public class ContainerAd extends View {
 		case MotionEvent.ACTION_DOWN:
 			mMoveStartX = ex;
 			mMoveStartY = ey;
+			mMoveLastX = ex;
+			mMoveLastY = ey;
+			mMoveDeltaX = 0f;
+			mMoveDeltaY = 0f;
 			break;
 		case MotionEvent.ACTION_MOVE:
 			mMoveDirection = getMoveDirection(ex, ey, mMoveStartX, mMoveStartY);
+			move(mMoveLastX, mMoveLastY, ex, ey, mMoveDirection);
+			mMoveLastX = ex;
+			mMoveLastY = ey;
 			break;
 		case MotionEvent.ACTION_UP:
 			testAnimation();
+			mMoveLastX = -1f;
+			mMoveLastY = -1f;
+			mMoveDeltaX = 0f;
+			mMoveDeltaY = 0f;
+			mMoveDirection = -1;
 			break;
 		}
 		return true;
+	}
+	
+	private void move(float sx, float sy, float ex, float ey, int direction) {
+		float deltaX = ex - sx;
+		float deltaY = ey - sy;
+		boolean moved = false;
+		switch(direction) {
+		case MOVE_DIRECTION_UP:
+			for(int i=1; i<ROW_COUNT; i++) {
+				for(int j=0; j<COLUMN_COUNT; j++) {
+					if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+						if(mNumbers[i][j].rectF.top + deltaY >= mBgCell[i-1][j].top && 
+								mNumbers[i][j].rectF.top + deltaY <= mBgCell[i][j].top) {
+							mNumbers[i][j].rectF.top += deltaY;
+							mNumbers[i][j].rectF.bottom += deltaY;
+							moved = true;
+						}
+					}
+				}
+			}
+			if(moved) {mMoveDeltaY += deltaY;}
+			break;
+		case MOVE_DIRECTION_RIGHT:
+			for(int i=0; i<ROW_COUNT; i++) {
+				for(int j=0; j<COLUMN_COUNT-1; j++) {
+					if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+						if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+							if(mNumbers[i][j].rectF.right + deltaX < mBgCell[i][j+1].right &&
+									mNumbers[i][j].rectF.right + deltaX > mBgCell[i][j].right) {
+								mNumbers[i][j].rectF.right += deltaX;
+								mNumbers[i][j].rectF.left += deltaX;
+								moved = true;
+							}
+						}
+					}
+				}
+			}
+			if(moved) {mMoveDeltaX += deltaX;}
+			break;
+		case MOVE_DIRECTION_DOWN:
+			for(int i=0; i<ROW_COUNT-1; i++) {
+				for(int j=0; j<COLUMN_COUNT; j++) {
+					if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+						if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+							if(mNumbers[i][j].rectF.bottom + deltaY <= mBgCell[i+1][j].bottom && 
+									mNumbers[i][j].rectF.bottom + deltaY >= mBgCell[i][j].bottom) {
+								mNumbers[i][j].rectF.top += deltaY;
+								mNumbers[i][j].rectF.bottom += deltaY;
+								moved = true;
+							}
+						}
+					}
+				}
+			}
+			if(moved) {mMoveDeltaY += deltaY;}
+			break;
+		case MOVE_DIRECTION_LEFT:
+			for(int i=0; i<ROW_COUNT; i++) {
+				for(int j=1; j<COLUMN_COUNT; j++) {
+					if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+						if(mNumbers[i][j] != null && canMove(i, j, direction)) {
+							if(mNumbers[i][j].rectF.left + deltaX > mBgCell[i][j-1].left &&
+									mNumbers[i][j].rectF.left + deltaX < mBgCell[i][j].left) {
+								mNumbers[i][j].rectF.left += deltaX;
+								mNumbers[i][j].rectF.right += deltaX;
+								moved = true;
+							}
+						}
+					}
+				} 
+			}
+			if(moved) {mMoveDeltaX += deltaX;}
+			break;
+		}
+		invalidate();
+	}
+	
+	Handler mHandler = new Handler() {
+		public void handleMessage(android.os.Message msg) {
+			if(msg.what == MSG_STEP_OVER) {
+				stepOver();
+			}
+		}
+	};
+	
+	/**
+	 * Do the numbers' add and move
+	 */
+	private void stepOver() {
+		switch(mMoveDirection) {
+		case MOVE_DIRECTION_UP:
+			for(int i=1; i<ROW_COUNT; i++) {
+				for(int j=0; j<COLUMN_COUNT; j++) {
+					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
+						if(mNumbers[i-1][j] != null) {
+							mNumbers[i][j].number += mNumbers[i-1][j].number;
+						}
+						mNumbers[i-1][j] = mNumbers[i][j];
+						mNumbers[i][j] = null;
+					}
+				}
+			}
+			break;
+		case MOVE_DIRECTION_RIGHT:
+			for(int j=COLUMN_COUNT-2; j>=0; j--) {
+				for(int i=0; i<ROW_COUNT; i++) {
+					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
+						if(mNumbers[i][j+1] != null) {
+							mNumbers[i][j].number += mNumbers[i][j+1].number;
+						}
+						mNumbers[i][j+1] = mNumbers[i][j];
+						mNumbers[i][j] = null;
+					}
+				}
+			}
+			break;
+		case MOVE_DIRECTION_DOWN:
+			for(int i=ROW_COUNT-2; i>=0; i--) {
+				for(int j=0; j<COLUMN_COUNT; j++) {
+					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
+						if(mNumbers[i+1][j] != null) {
+							mNumbers[i][j].number += mNumbers[i+1][j].number;
+						}
+						mNumbers[i+1][j] = mNumbers[i][j];
+						mNumbers[i][j] = null;
+					}
+				}
+			}
+			break;
+		case MOVE_DIRECTION_LEFT:
+			for(int j=1; j<COLUMN_COUNT; j++) {
+				for(int i=0; i<ROW_COUNT; i++) {
+					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
+						if(mNumbers[i][j-1] != null) {
+							mNumbers[i][j].number += mNumbers[i][j-1].number;
+						}
+						mNumbers[i][j-1] = mNumbers[i][j];
+						mNumbers[i][j] = null;
+					}
+				}
+			}
+			break;
+		}
+		invalidate();
 	}
 	
 	private int getMoveDirection(float ex, float ey, float sx, float sy) {
@@ -185,16 +356,24 @@ public class ContainerAd extends View {
 	private void testAnimation() {
 		switch(mMoveDirection) {
 		case MOVE_DIRECTION_UP:
-			showAnimation(0, mBgCell[0][0].top - mBgCell[0][0].bottom - mRowGap);
+			float deltaY = (mBgCell[0][0].top - mBgCell[0][0].bottom - mRowGap) - 
+					mMoveDeltaY;
+			showAnimation(0, deltaY);
 			break;
 		case MOVE_DIRECTION_RIGHT:
-			showAnimation(mBgCell[0][0].right - mBgCell[0][0].left + mColumnGap, 0);
+			float deltaX = (mBgCell[0][0].right - mBgCell[0][0].left + mColumnGap) - 
+					mMoveDeltaX;
+			showAnimation(deltaX, 0);
 			break;
 		case MOVE_DIRECTION_DOWN:
-			showAnimation(0, mBgCell[0][0].bottom - mBgCell[0][0].top + mRowGap);
+		   	float deltaY2 = (mBgCell[0][0].bottom - mBgCell[0][0].top + mRowGap) - 
+					mMoveDeltaY;
+			showAnimation(0, deltaY2);
 			break;
 		case MOVE_DIRECTION_LEFT:
-			showAnimation(mBgCell[0][0].left - mBgCell[0][0].right - mColumnGap, 0);
+			float deltaX2 = (mBgCell[0][0].left - mBgCell[0][0].right - mColumnGap) - 
+					mMoveDeltaX;
+			showAnimation(deltaX2, 0);
 			break;
 		}
 	}
@@ -210,7 +389,7 @@ public class ContainerAd extends View {
 				while(translateCount > 0) {
 					for(int i=0; i<ROW_COUNT; i++) {
 						for(int j=0; j<COLUMN_COUNT; j++) {
-							if(mNumbers[i][j] != null && canMove(i, j)) {
+							if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
 								mNumbers[i][j].rectF.left += deltaX;
 								mNumbers[i][j].rectF.right += deltaX;
 								mNumbers[i][j].rectF.top += deltaY;
@@ -234,7 +413,7 @@ public class ContainerAd extends View {
 				while(rotateTime < rotateCount) {
 					for(int i=0; i<ROW_COUNT; i++) {
 						for(int j=0; j<COLUMN_COUNT; j++) {
-							if(mNumbers[i][j] != null && canMove(i, j)) {
+							if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
 								if(rotateTime < rotateCount/2) {
 									mNumbers[i][j].rectF.left += deltaRotateX/2;
 									mNumbers[i][j].rectF.right -= deltaRotateX/2;	
@@ -253,14 +432,60 @@ public class ContainerAd extends View {
 						e.printStackTrace();
 					}
 				}
+				
+				Message msg = new Message();
+				msg.what = MSG_STEP_OVER;
+				mHandler.sendMessage(msg);
 				super.run();
 			}
 		};
 		translateThread.start();
 	}
 	
-	private boolean canMove(int row, int column) {
-		boolean canMove = true;
+	private boolean canMove(int row, int column, int direction) {
+		boolean canMove = false;
+		if(mNumbers[row][column] == null) {
+			return false;
+		}
+		
+		switch(direction) {
+		case MOVE_DIRECTION_UP:
+			if(row == 0) {
+				canMove = false;
+			} else if(mNumbers[row-1][column] == null || 
+					mNumbers[row-1][column].number == mNumbers[row][column].number ||
+					mNumbers[row][column].number + mNumbers[row-1][column].number == 3){
+				canMove = true;
+			}
+			break;
+		case MOVE_DIRECTION_RIGHT:
+			if(column == COLUMN_COUNT - 1) {
+				canMove = false;
+			} else if(mNumbers[row][column+1] == null || 
+					mNumbers[row][column+1].number == mNumbers[row][column].number ||
+					mNumbers[row][column].number + mNumbers[row][column+1].number == 3){
+				canMove = true;
+			}
+			break;
+		case MOVE_DIRECTION_DOWN:
+			if(row == ROW_COUNT - 1) {
+				canMove = false;
+			} else if(mNumbers[row+1][column] == null || 
+					mNumbers[row+1][column].number == mNumbers[row][column].number ||
+					mNumbers[row][column].number + mNumbers[row+1][column].number == 3){
+				canMove = true;
+			}
+			break;
+		case MOVE_DIRECTION_LEFT:
+			if(column == 0) {
+				canMove = false;
+			} else if(mNumbers[row][column-1] == null || 
+					mNumbers[row][column-1].number == mNumbers[row][column].number ||
+					mNumbers[row][column].number + mNumbers[row][column-1].number == 3){
+				canMove = true;
+			}
+			break;
+		}
 		return canMove;
 	}
 	
@@ -312,17 +537,6 @@ public class ContainerAd extends View {
 					canvas.drawRoundRect(mNumbers[i][j].rectF, 10, 10, mPaint);
 					canvas.restore();
 				}
-//				if(mNumberCell[i][j] != null) {
-//					int color = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
-//					mPaint.setColor(color);
-//					canvas.drawRoundRect(mNumberCell[i][j], 10, 10, mPaint);
-//					canvas.save();
-//					int color2 = (int)(Math.random()*Integer.MAX_VALUE) & 0xFFFFFFFF;
-//					mPaint.setColor(color2);
-//					canvas.translate(0, mRowGap/2);
-//					canvas.drawRoundRect(mNumberCell[i][j], 10, 10, mPaint);
-//					canvas.restore();
-//				}
 			}
 		}
 	}
