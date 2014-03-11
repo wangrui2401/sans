@@ -8,7 +8,9 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
@@ -38,6 +40,7 @@ public class ContainerAd extends View {
 	private static final int COLOR_RED_BOTTOM = 0xffce557b;
 	private static final int COLOR_WHITE = 0xffffffff;
 	private static final int COLOR_YELLOW = 0xffffce6b;
+	private static final int COLOR_BLACK = 0xff000000;
 	
 	private static final int MSG_STEP_OVER = 101;
 	private static final int MSG_ROTATE = 102;
@@ -356,7 +359,7 @@ public class ContainerAd extends View {
 					if(mNumbers[i][j] != null && canMove(i, j, direction)) {
 						if(mNumbers[i][j].rectF.left + deltaX > mBgCell[i][j-1].left &&
 								mNumbers[i][j].rectF.left + deltaX < mBgCell[i][j].left - mColumnGap/4) {
-							mNumbers[i][j].rectF.right += deltaX;
+				 			mNumbers[i][j].rectF.right += deltaX;
 							mNumbers[i][j].rectF.left  = mNumbers[i][j].rectF.right - 
 									mBgCell[i][j].right + mBgCell[i][j].left - mColumnGap/4;
 							moved = true;
@@ -871,10 +874,41 @@ public class ContainerAd extends View {
 					mPaint.setColor(colorTop);
 					canvas.translate(0, -mRowGap/2);
 					canvas.drawRoundRect(mNumbers[i][j].rectF, 10, 10, mPaint);
+					
+					mPaint.setColor(mNumbers[i][j].getFontColor());
+					String value = mNumbers[i][j].number + "";
+					mPaint.setTypeface(Typeface.SANS_SERIF);
+					setTextSizeForWidth(mPaint, mNumbers[i][j].rectF.width()*4/5, 
+							mNumbers[i][j].rectF.height()/2, value);
+					Rect rect = new Rect();  
+					mPaint.getTextBounds(value, 0, value.length(), rect);  
+					float valueW = rect.width();  
+					float valueH = rect.height();  
+					float valueX = mNumbers[i][j].rectF.left + 
+							(mNumbers[i][j].rectF.width() - valueW)/2;
+					float valueY = mNumbers[i][j].rectF.bottom - 
+							(mNumbers[i][j].rectF.height() - valueH)/2;
+					canvas.drawText(value, valueX, valueY, mPaint);
+					
 					canvas.restore();
 				}
 			}
 		}
+	}
+	
+	private static void setTextSizeForWidth(Paint paint, float desiredWidth,
+			float desiredHeight, String text) {
+
+	    final float testTextSize = 48f;
+
+	    paint.setTextSize(testTextSize);
+	    Rect bounds = new Rect();
+	    paint.getTextBounds(text, 0, text.length(), bounds);
+
+	    float desiredTextSize = testTextSize * desiredWidth / bounds.width();
+	    float desiredTextSize2 = testTextSize * desiredHeight / bounds.height();
+	    desiredTextSize = desiredTextSize>desiredTextSize2?desiredTextSize2:desiredTextSize;
+	    paint.setTextSize(desiredTextSize);
 	}
 	
 	class Number {
@@ -915,6 +949,14 @@ public class ContainerAd extends View {
 				}
 			}
 			return colorBottom;
+		}
+		
+		public int getFontColor() {
+			if(number == 1 || number == 2) {
+				return COLOR_WHITE;
+			} else {
+				return COLOR_BLACK;
+			}
 		}
 	}
 
