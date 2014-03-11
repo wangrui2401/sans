@@ -1,5 +1,9 @@
 package com.funny.threes;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -21,10 +25,12 @@ public class ContainerAd extends View {
 	private static final int MOVE_DIRECTION_DOWN = 2;
 	private static final int MOVE_DIRECTION_LEFT = 3;
 	
-	private static final int TRANSLATE_ANIMATION_DURATION = 250;
-	private static final int TRANSLATE_ANIMATION_INTERVAL = 25;
+	private static final int TRANSLATE_ANIMATION_DURATION = 200;
+	private static final int TRANSLATE_ANIMATION_INTERVAL = 10;
 	private static final int ROTATE_ANIMATION_DURATION = 300;
 	private static final int ROTATE_ANIMATION_INTERVAL = 25;
+	private static final int NEW_NUMBER_ANIMATION_DURATION = 200;
+	private static final int NEW_NUMBER_ANIMATION_INTERVAL = 10;
 	
 	private static final int COLOR_BLUE_TOP = 0xff6bceff;
 	private static final int COLOR_BLUE_BOTTOM = 0xff63aaf7;
@@ -48,6 +54,7 @@ public class ContainerAd extends View {
 	float mMoveDeltaX, mMoveDeltaY;
 	int mMoveDirection = -1;
 	boolean mIsShowAnimation = false;
+//	List<Number>
 	  
 	public ContainerAd(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -199,6 +206,97 @@ public class ContainerAd extends View {
 		return true;
 	}
 	
+	private void newNumber(int direction) {
+		Number number = generateNewNumber(direction);
+		if(number != null) {
+			mNumbers[number.row][number.column] = number;
+			newNumberAnimation(number, direction);
+		}
+	}
+	
+	/**
+	 * Add new number to view
+	 * @param direction
+	 */
+	private Number generateNewNumber(int direction) {
+		int row = -1, column = -1;
+		List<Integer> available = new ArrayList<Integer>();
+		
+		switch(direction) {
+		case MOVE_DIRECTION_UP:
+			row = ROW_COUNT - 1;
+			available.clear();
+			for(int i=0; i<COLUMN_COUNT; i++) {
+				if(mNumbers[row][i] == null) {
+					available.add(i);
+				}
+			}
+			if(available.size() > 0) {
+				Random random = new Random();
+				int index = random.nextInt(available.size());
+				column = available.get(index);
+			}
+			break;
+		case MOVE_DIRECTION_DOWN:
+			row = 0;
+			available.clear();
+			for(int i=0; i<COLUMN_COUNT; i++) {
+				if(mNumbers[row][i] == null) {
+					available.add(i);
+				}
+			}
+			if(available.size() > 0) {
+				Random random = new Random();
+				int index = random.nextInt(available.size());
+				column = available.get(index);
+			}
+			break;
+		case MOVE_DIRECTION_RIGHT:
+			column = 0;
+			available.clear();
+			for(int i=0; i<ROW_COUNT; i++) {
+				if(mNumbers[i][column] == null) {
+					available.add(i);
+				}
+			}
+			if(available.size() > 0) {
+				Random random = new Random();
+				int index = random.nextInt(available.size());
+				row = available.get(index);
+			}
+			break;
+		case MOVE_DIRECTION_LEFT:
+			column = COLUMN_COUNT - 1;
+			available.clear();
+			for(int i=0; i<ROW_COUNT; i++) {
+				if(mNumbers[i][column] == null) {
+					available.add(i);
+				}
+			}
+			if(available.size() > 0) {
+				Random random = new Random();
+				int index = random.nextInt(available.size());
+				row = available.get(index);
+			}
+			break;
+		}
+		
+		if(row >= 0 && row < ROW_COUNT && column >= 0 && column < COLUMN_COUNT) {
+			int value = newNumberValue();
+			Number number = generateNumber(row, column, value);
+			return number;
+		}
+		return null;
+	}
+	
+	/**
+	 * Generate the new number's value, 1, 2, 3, 6...
+	 */
+	private int newNumberValue() {
+		Random rand = new Random();
+		return rand.nextInt(2) + 1;
+	}
+	
 	private void move(float sx, float sy, float ex, float ey, int direction) {
 		float deltaX = ex - sx;
 		float deltaY = ey - sy;
@@ -228,7 +326,7 @@ public class ContainerAd extends View {
 								mNumbers[i][j].rectF.right + deltaX > mBgCell[i][j].right) {
 							mNumbers[i][j].rectF.right += deltaX;
 							mNumbers[i][j].rectF.left = mNumbers[i][j].rectF.right - 
-									mBgCell[i][j].right + mBgCell[i][j].left;
+									mBgCell[i][j].right + mBgCell[i][j].left - mColumnGap/4;
 							moved = true;
 						}
 					}
@@ -257,10 +355,10 @@ public class ContainerAd extends View {
 				for(int j=1; j<COLUMN_COUNT; j++) {
 					if(mNumbers[i][j] != null && canMove(i, j, direction)) {
 						if(mNumbers[i][j].rectF.left + deltaX > mBgCell[i][j-1].left &&
-								mNumbers[i][j].rectF.left + deltaX < mBgCell[i][j].left) {
+								mNumbers[i][j].rectF.left + deltaX < mBgCell[i][j].left - mColumnGap/4) {
 							mNumbers[i][j].rectF.right += deltaX;
 							mNumbers[i][j].rectF.left  = mNumbers[i][j].rectF.right - 
-									mBgCell[i][j].right + mBgCell[i][j].left;
+									mBgCell[i][j].right + mBgCell[i][j].left - mColumnGap/4;
 							moved = true;
 						}
 					}
@@ -286,13 +384,15 @@ public class ContainerAd extends View {
 	 * Do the numbers' add and move
 	 */
 	private void stepOver() {
+		List<Number> numbers = new ArrayList<Number>();
 		switch(mMoveDirection) {
 		case MOVE_DIRECTION_UP:
 			for(int i=1; i<ROW_COUNT; i++) {
 				for(int j=0; j<COLUMN_COUNT; j++) {
 					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
-						if(mNumbers[i-1][j] != null) {
+						if(canEat(i, j, mMoveDirection)) {
 							mNumbers[i][j].number += mNumbers[i-1][j].number;
+							numbers.add(mNumbers[i][j]);
 						}
 						mNumbers[i-1][j] = mNumbers[i][j];
 						mNumbers[i][j] = null;
@@ -304,8 +404,9 @@ public class ContainerAd extends View {
 			for(int j=COLUMN_COUNT-2; j>=0; j--) {
 				for(int i=0; i<ROW_COUNT; i++) {
 					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
-						if(mNumbers[i][j+1] != null) {
+						if(canEat(i, j, mMoveDirection)) {
 							mNumbers[i][j].number += mNumbers[i][j+1].number;
+							numbers.add(mNumbers[i][j]);
 						}
 						mNumbers[i][j+1] = mNumbers[i][j];
 						mNumbers[i][j] = null;
@@ -317,8 +418,9 @@ public class ContainerAd extends View {
 			for(int i=ROW_COUNT-2; i>=0; i--) {
 				for(int j=0; j<COLUMN_COUNT; j++) {
 					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
-						if(mNumbers[i+1][j] != null) {
+						if(canEat(i, j, mMoveDirection)) {
 							mNumbers[i][j].number += mNumbers[i+1][j].number;
+							numbers.add(mNumbers[i][j]);
 						}
 						mNumbers[i+1][j] = mNumbers[i][j];
 						mNumbers[i][j] = null;
@@ -330,8 +432,9 @@ public class ContainerAd extends View {
 			for(int j=1; j<COLUMN_COUNT; j++) {
 				for(int i=0; i<ROW_COUNT; i++) {
 					if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
-						if(mNumbers[i][j-1] != null) {
+						if(canEat(i, j, mMoveDirection)) {
 							mNumbers[i][j].number += mNumbers[i][j-1].number;
+							numbers.add(mNumbers[i][j]);
 						}
 						mNumbers[i][j-1] = mNumbers[i][j];
 						mNumbers[i][j] = null;
@@ -340,6 +443,8 @@ public class ContainerAd extends View {
 			}
 			break;
 		}
+		rotateAnimationAd(numbers);
+		newNumber(mMoveDirection);
 		invalidate();
 		mMoveDirection = -1;
 		mIsShowAnimation = false;
@@ -416,6 +521,14 @@ public class ContainerAd extends View {
 	private void translateAnimation(float deltaTotalX, float deltaTotalY, final boolean back) {
 		mIsShowAnimation = true;
 		
+		final List<Number> moveNumbers = new ArrayList<Number>();
+		for(int i=0; i<ROW_COUNT; i++) {
+			for(int j=0; j<COLUMN_COUNT; j++) {
+				if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
+					moveNumbers.add(mNumbers[i][j]);
+				}
+			}
+		}
 		final float deltaX = deltaTotalX/(TRANSLATE_ANIMATION_DURATION/TRANSLATE_ANIMATION_INTERVAL);
 		final float deltaY = deltaTotalY/(TRANSLATE_ANIMATION_DURATION/TRANSLATE_ANIMATION_INTERVAL);
 		Thread translateThread = new Thread() {
@@ -425,14 +538,13 @@ public class ContainerAd extends View {
 				
 				//translate animation
 				while(translateCount > 0) {
-					for(int i=0; i<ROW_COUNT; i++) {
-						for(int j=0; j<COLUMN_COUNT; j++) {
-							if(mNumbers[i][j] != null && canMove(i, j, mMoveDirection)) {
-								mNumbers[i][j].rectF.left += deltaX;
-								mNumbers[i][j].rectF.right += deltaX;
-								mNumbers[i][j].rectF.top += deltaY;
-								mNumbers[i][j].rectF.bottom += deltaY;
-							}
+					for(int i=0; i<moveNumbers.size(); i++) {
+						Number number = moveNumbers.get(i);
+						if(number != null) {
+							number.rectF.left += deltaX;
+							number.rectF.right += deltaX;
+							number.rectF.top += deltaY;
+							number.rectF.bottom += deltaY;
 						}
 					}
 					postInvalidate();
@@ -446,7 +558,7 @@ public class ContainerAd extends View {
 				
 				if(!back) {
 					Message msg = new Message();
-					msg.what = MSG_ROTATE;
+					msg.what = MSG_STEP_OVER;
 					mHandler.sendMessage(msg);
 				} else {
 					mIsShowAnimation = false;
@@ -456,6 +568,42 @@ public class ContainerAd extends View {
 			}
 		};
 		translateThread.start();
+	}
+	
+	private void rotateAnimationAd(final List<Number> numbers) {
+		Thread rotateThread = new Thread() {
+			
+			@Override
+			public void run() {
+				//rotate, Note: rotateCount must be even number
+				int rotateCount = ROTATE_ANIMATION_DURATION/ROTATE_ANIMATION_INTERVAL;
+				int rotateTime = 0;
+				float deltaRotateX = (mBgCell[0][0].right - mBgCell[0][0].left + mColumnGap/4)/rotateCount*2;
+				while(rotateTime < rotateCount) {
+					for(int i=0; i<numbers.size(); i++) {
+						Number number = numbers.get(i);
+						if(number != null) {
+							if(rotateTime < rotateCount/2) {
+								number.rectF.left += deltaRotateX/2;
+								number.rectF.right -= deltaRotateX/2;	
+							} else {
+								number.rectF.left -= deltaRotateX/2;
+								number.rectF.right += deltaRotateX/2;
+							}	
+						}
+					}
+					postInvalidate();
+					rotateTime++;
+					try {
+						Thread.sleep(TRANSLATE_ANIMATION_INTERVAL);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				super.run();
+			}
+		};
+		rotateThread.start();
 	}
 	
 	private void rotateAnimation() {
@@ -497,6 +645,74 @@ public class ContainerAd extends View {
 			}
 		};
 		rotateThread.start();
+	}
+	
+	private void newNumberAnimation(final Number number, int direction) {
+		float startX = 0f, startY = 0f;
+		float deltaTotalX = 0f, deltaTotalY = 0f;
+		
+		if(number == null) {
+			return;
+		}
+		
+		switch(direction) {
+		case MOVE_DIRECTION_UP:
+			startY = getHeight();
+			deltaTotalY = number.rectF.bottom - startY;
+			number.rectF.top -= deltaTotalY;
+			number.rectF.bottom -= deltaTotalY;
+			break;
+		case MOVE_DIRECTION_DOWN:
+			startY = 0f;
+			deltaTotalY = number.rectF.top - startY;
+			number.rectF.top -= deltaTotalY;
+			number.rectF.bottom -= deltaTotalY;
+			break;
+		case MOVE_DIRECTION_RIGHT:
+			startX = 0f;
+			deltaTotalX = number.rectF.left - startX;
+			number.rectF.left -= deltaTotalX;
+			number.rectF.right -= deltaTotalX;
+			break;
+		case MOVE_DIRECTION_LEFT:
+			startX = getWidth();
+			deltaTotalX = number.rectF.right - startX;
+			number.rectF.left -= deltaTotalX;
+			number.rectF.right -= deltaTotalX;
+			break;
+		}
+		
+		final float deltaX = deltaTotalX/
+				(NEW_NUMBER_ANIMATION_DURATION/NEW_NUMBER_ANIMATION_INTERVAL);
+		final float deltaY = deltaTotalY/
+				(NEW_NUMBER_ANIMATION_DURATION/NEW_NUMBER_ANIMATION_INTERVAL);
+		
+		Thread translateThread = new Thread() {
+			int translateCount = NEW_NUMBER_ANIMATION_DURATION/NEW_NUMBER_ANIMATION_INTERVAL;
+			@Override
+			public void run() {
+				
+				//translate animation
+				while(translateCount > 0) {
+					if(number != null) {
+						number.rectF.left += deltaX;
+						number.rectF.right += deltaX;
+						number.rectF.top += deltaY;
+						number.rectF.bottom += deltaY;
+					}
+					postInvalidate();
+					translateCount--;
+					try {
+						Thread.sleep(TRANSLATE_ANIMATION_INTERVAL);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				
+				super.run();
+			}
+		};
+		translateThread.start();
 	}
 	
 	private boolean canEat(int row, int column, int direction) {
@@ -561,7 +777,8 @@ public class ContainerAd extends View {
 			if(row == 0) {
 				canMove = false;
 			} else if(mNumbers[row-1][column] == null || 
-					mNumbers[row-1][column].number == mNumbers[row][column].number ||
+					((mNumbers[row-1][column].number == mNumbers[row][column].number) &&
+							mNumbers[row][column].number > 2) ||
 					mNumbers[row][column].number + mNumbers[row-1][column].number == 3){
 				canMove = true;
 			} else if(canMove(row-1, column, direction)) {
@@ -572,7 +789,8 @@ public class ContainerAd extends View {
 			if(column == COLUMN_COUNT - 1) {
 				canMove = false;
 			} else if(mNumbers[row][column+1] == null || 
-					mNumbers[row][column+1].number == mNumbers[row][column].number ||
+					((mNumbers[row][column+1].number == mNumbers[row][column].number) &&
+							mNumbers[row][column].number > 2) ||
 					mNumbers[row][column].number + mNumbers[row][column+1].number == 3){
 				canMove = true;
 			} else if(canMove(row, column+1, direction)) {
@@ -583,7 +801,8 @@ public class ContainerAd extends View {
 			if(row == ROW_COUNT - 1) {
 				canMove = false;
 			} else if(mNumbers[row+1][column] == null || 
-					mNumbers[row+1][column].number == mNumbers[row][column].number ||
+					((mNumbers[row+1][column].number == mNumbers[row][column].number) &&
+							mNumbers[row][column].number > 2)||
 					mNumbers[row][column].number + mNumbers[row+1][column].number == 3){
 				canMove = true;
 			} else if(canMove(row+1, column, direction)) {
@@ -594,7 +813,8 @@ public class ContainerAd extends View {
 			if(column == 0) {
 				canMove = false;
 			} else if(mNumbers[row][column-1] == null || 
-					mNumbers[row][column-1].number == mNumbers[row][column].number ||
+					((mNumbers[row][column-1].number == mNumbers[row][column].number) &&
+							mNumbers[row][column].number > 2) ||
 					mNumbers[row][column].number + mNumbers[row][column-1].number == 3){
 				canMove = true;
 			} else if(canMove(row, column-1, direction)) {
